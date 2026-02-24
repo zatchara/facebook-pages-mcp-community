@@ -85,3 +85,39 @@ docker compose up -d
 - **npm**: [@node2flow/facebook-pages-mcp](https://www.npmjs.com/package/@node2flow/facebook-pages-mcp)
 - **GitHub**: [node2flow-th/facebook-pages-mcp-community](https://github.com/node2flow-th/facebook-pages-mcp-community)
 - **Smithery**: [node2flow/facebook-pages](https://smithery.ai/server/node2flow/facebook-pages)
+
+## Maintenance Notes (Patchara Fork)
+
+Use this section as source of truth for our fork maintenance.
+
+### Token Type Rules
+
+- `fb_list_posts` and most page operations require a **Page access token**.
+- A **User token** can list pages via `GET /me/accounts` but cannot read page feed directly for New Pages Experience.
+- Quick check:
+  - User token: `GET /me/accounts` works.
+  - Page token: `GET /{page_id}/feed` works.
+
+### What We Fixed Locally
+
+- Fixed MCP crash (`v3Schema.safeParseAsync is not a function`) by removing raw JSON `inputSchema` pass-through in `registerTool`.
+- Added robust callback argument handling so tool args are read whether MCP SDK passes `(args, extra)` or only `(extra)`.
+- Added `FACEBOOK_PAGE_ID` fallback so tools can still work when `page_id` is missing in runtime args.
+- Added `fb_list_pages` fallback for page-token mode:
+  - If `me/accounts` is unavailable, server falls back to `GET /me` and returns single-page result.
+
+### Recommended Config
+
+Set both values in MCP env:
+
+- `FACEBOOK_PAGE_ACCESS_TOKEN` = page token for target page
+- `FACEBOOK_PAGE_ID` = target page id
+
+### Quick Smoke Test
+
+After restart:
+
+1. `fb_list_pages`
+2. `fb_list_posts` with `page_id` and `limit`
+
+If both return data, core path is healthy.
