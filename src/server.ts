@@ -107,7 +107,6 @@ export function createServer(config?: FacebookMcpConfig) {
       tool.name,
       {
         description: tool.description,
-        inputSchema: tool.inputSchema as any,
         annotations: tool.annotations,
       },
       async (args: Record<string, unknown>) => {
