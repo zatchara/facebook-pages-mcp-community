@@ -109,7 +109,9 @@ export function createServer(config?: FacebookMcpConfig) {
         description: tool.description,
         annotations: tool.annotations,
       },
-      async (args: Record<string, unknown>) => {
+      async (extra: any) => {
+        const rawArgs = (extra?.request?.params?.arguments ?? {}) as Record<string, unknown>;
+        const args = rawArgs;
         const pageAccessToken =
           config?.pageAccessToken ||
           (args as Record<string, unknown>).FACEBOOK_PAGE_ACCESS_TOKEN as string;
@@ -132,8 +134,34 @@ export function createServer(config?: FacebookMcpConfig) {
             isError: false,
           };
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const needsPageToken = message.includes('User access token is not supported');
+
+          if (needsPageToken && tool.name !== 'fb_list_pages') {
+            try {
+              const pages = await client.listPages();
+              const targetPageId =
+                (args.page_id as string | undefined) ||
+                (typeof args.post_id === 'string' ? args.post_id.split('_')[0] : undefined) ||
+                config?.pageId ||
+                pages[0]?.id;
+
+              const page = pages.find((p) => p.id === targetPageId) || pages[0];
+              if (page?.access_token) {
+                const pageClient = new FacebookClient({ pageAccessToken: page.access_token, pageId: page.id });
+                const retryResult = await handleToolCall(tool.name, args, pageClient);
+                return {
+                  content: [{ type: 'text' as const, text: JSON.stringify(retryResult, null, 2) }],
+                  isError: false,
+                };
+              }
+            } catch {
+              // fall through to original error response
+            }
+          }
+
           return {
-            content: [{ type: 'text' as const, text: `Error: ${error instanceof Error ? error.message : String(error)}` }],
+            content: [{ type: 'text' as const, text: `Error: ${message}` }],
             isError: true,
           };
         }
